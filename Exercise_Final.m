@@ -22,7 +22,6 @@ videoFPS = video.FrameRate;
 
 % Plot the lens distortion
 ut_plot_lens_distortion(cameraParams, [videoHeight videoWidth]);
-figure;
 
 % Initialise a frame counter.
 currentFrame = 0;
@@ -31,18 +30,18 @@ xBuoyInitial = [];
 yBuoyInitial = [];
 
 %Loop through the video.
+figure;
 while hasFrame(video)
     tic;
     
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
-    imshow(frame)
-    hold on;
     
     if currentFrame == 1
         % Only extract the coordinates of the buoy in the first frame.
         % GCF is the MATLAB key to the current figure.
+        imshow(frame)
         while (size(xBuoyInitial, 1) > 1 || size(yBuoyInitial, 1) > 1) || (isempty(xBuoyInitial) || isempty(yBuoyInitial))
             uiwait(msgbox({'Please pick one point.';...
                            'A shift-, right-, or double-click adds a final point and ends the selection.';...
@@ -51,14 +50,19 @@ while hasFrame(video)
             [xBuoyInitial, yBuoyInitial] = getpts(gcf);
         end
     end
+    [frameUndistorted,~] = undistortImage(frame,cameraParams);
+    imshow(frameUndistorted)
+    hold on
     % Draw the search grid in the image
     rectangle('Position',[xBuoyInitial-0.5*widthSearchArea, yBuoyInitial-0.5*heightSearchArea, widthSearchArea, heightSearchArea],...
 	'EdgeColor', 'r', 'LineWidth', 3, 'LineStyle','-', 'Curvature', 0.2)
-    hold off;
+    hold off
     T = toc;
     
+    pause(0.1)
     % Limit to video's fps
-    if T < 1/videoFPS
-        pause((1/videoFPS)-T)
-    end
+%     if T < 1/videoFPS
+%         (1/videoFPS)-T
+%         pause((1/videoFPS)-T)
+%     end
 end
