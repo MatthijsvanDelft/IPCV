@@ -21,7 +21,7 @@ videoHeight = video.Height;
 videoFPS = video.FrameRate;
 
 % Plot the lens distortion
-ut_plot_lens_distortion(cameraParams, [videoWidth videoHeight]);
+ut_plot_lens_distortion(cameraParams, [videoHeight videoWidth]);
 figure;
 
 % Initialise a frame counter.
