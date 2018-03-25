@@ -20,6 +20,10 @@ videoWidth = video.Width;
 videoHeight = video.Height;
 videoFPS = video.FrameRate;
 
+% Plot the lens distortion
+ut_plot_lens_distortion(cameraParams, [videoWidth videoHeight]);
+figure;
+
 % Initialise a frame counter.
 currentFrame = 0;
 % Initialise initial buoy coordinates.
