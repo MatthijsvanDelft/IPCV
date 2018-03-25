@@ -10,14 +10,15 @@ load('cameraParams.mat');
 load('estimationErrors.mat');
 
 % Parameters
-widthSearchArea = 50; % In pixels.
-heightSearchArea = 50; % In pixels.
+widthSearchArea = 200; % In pixels.
+heightSearchArea = 100; % In pixels.
 
 %% Show the video
 % Read in the video and get its width and height.
 video = VideoReader('MAH01462.MP4');
 videoWidth = video.Width;
 videoHeight = video.Height;
+videoFPS = video.FrameRate;
 
 % Initialise a frame counter.
 currentFrame = 0;
@@ -52,8 +53,8 @@ while hasFrame(video)
     hold off;
     T = toc;
     
-    % Limit to 30 fps
-    if T < 1/30
-        pause((1/30)-T)
+    % Limit to video's fps
+    if T < 1/videoFPS
+        pause((1/videoFPS)-T)
     end
 end
