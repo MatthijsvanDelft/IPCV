@@ -10,7 +10,7 @@ load('cameraParams.mat');
 load('estimationErrors.mat');
 
 % Parameters
-widthSearchArea = 200; % In pixels.
+widthSearchArea = 100; % In pixels.
 heightSearchArea = 100; % In pixels.
 FPS = (1/5); % 5 Frames per Second
 
@@ -33,13 +33,14 @@ yBuoy = [];
 ptThresh = 0.1;
 
 % Create optical flow object using Lucas-Kanade
-flowObj = opticalFlowLK('NoiseThreshold', 0.0050);
+flowObj = opticalFlowHS;
 
 %Loop through the video.
-figure;
+flowPhaseMag = figure;
+videoFigure = figure;
 while hasFrame(video)
     tic;
-    
+    figure(videoFigure)
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
@@ -83,16 +84,19 @@ while hasFrame(video)
                                              :);
         
         flow = flowObj.estimateFlow(rgb2gray(frameCutout));
-        imshow(frameCutout)
+        imshow(rgb2gray(frameCutout))
         hold on
         plot(flow);
-
-        % Draw the search grid in the image
-        rectangle( 'Position',[xBuoy-0.5*widthSearchArea,...
-                   yBuoy-0.5*heightSearchArea, widthSearchArea,...
-                   heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
-                   'LineStyle','-', 'Curvature', 0.2)
         hold off
+        figure(flowPhaseMag);
+        polarscatter(-flow.Orientation(:), flow.Magnitude(:), '.');
+        
+%         % Draw the search grid in the image
+%         rectangle( 'Position',[xBuoy-0.5*widthSearchArea,...
+%                    yBuoy-0.5*heightSearchArea, widthSearchArea,...
+%                    heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
+%                    'LineStyle','-', 'Curvature', 0.2)
+%         hold off
     end
     framePrev = frameUndistorted;
     T = toc
