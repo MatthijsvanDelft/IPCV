@@ -12,6 +12,7 @@ load('estimationErrors.mat');
 % Parameters
 widthSearchArea = 200; % In pixels.
 heightSearchArea = 100; % In pixels.
+FPS = (1/5); % 5 Frames per Second
 
 %% Show the video
 % Read in the video and get its width and height.
@@ -28,6 +29,9 @@ currentFrame = 0;
 % Initialise initial buoy coordinates.
 xBuoyInitial = [];
 yBuoyInitial = [];
+
+% Create optical flow object using Lucas-Kanade
+flowObj = opticalFlowLK('NoiseThreshold', 0.025);
 
 %Loop through the video.
 figure;
@@ -51,18 +55,21 @@ while hasFrame(video)
         end
     end
     [frameUndistorted,~] = undistortImage(frame,cameraParams);
+    flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
     imshow(frameUndistorted)
     hold on
+    plot(flow);
+
     % Draw the search grid in the image
-    rectangle('Position',[xBuoyInitial-0.5*widthSearchArea, yBuoyInitial-0.5*heightSearchArea, widthSearchArea, heightSearchArea],...
-	'EdgeColor', 'r', 'LineWidth', 3, 'LineStyle','-', 'Curvature', 0.2)
+%     rectangle('Position',[xBuoyInitial-0.5*widthSearchArea, yBuoyInitial-0.5*heightSearchArea, widthSearchArea, heightSearchArea],...
+% 	'EdgeColor', 'r', 'LineWidth', 3, 'LineStyle','-', 'Curvature', 0.2)
     hold off
     T = toc;
     
-    pause(0.1)
-    % Limit to video's fps
-%     if T < 1/videoFPS
-%         (1/videoFPS)-T
-%         pause((1/videoFPS)-T)
+%   Limit to 10 FPS
+%     if T < FPS
+%         FPS-T
+%         pause(0.04)
 %     end
+    drawnow
 end
