@@ -30,6 +30,8 @@ currentFrame = 0;
 xBuoyInitial = [];
 yBuoyInitial = [];
 
+ptThresh = 0.1;
+
 % Create optical flow object using Lucas-Kanade
 flowObj = opticalFlowLK('NoiseThreshold', 0.0050);
 
@@ -41,6 +43,9 @@ while hasFrame(video)
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
+    
+    % Fix lens distortion.
+    [frameUndistorted,~] = undistortImage(frame,cameraParams);
     
     if currentFrame == 1
         % Only extract the coordinates of the buoy in the first frame.
@@ -54,19 +59,55 @@ while hasFrame(video)
             [xBuoyInitial, yBuoyInitial] = getpts(gcf);
         end
     end
-    [frameUndistorted,~] = undistortImage(frame,cameraParams);
-    flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
-    imshow(frameUndistorted)
-    hold on
-    plot(flow);
+    
+    if currentFrame >=2
+        pointsCur = detectFASTFeatures(rgb2gray(frameUndistorted), 'MinContrast', ptThresh);
+        pointsPrev = detectFASTFeatures(rgb2gray(framePrev), 'MinContrast', ptThresh);
+        
+        [featuresCur, pointsCur] = extractFeatures(rgb2gray(frameUndistorted), pointsCur);
+        [featuresPrev, pointsPrev] = extractFeatures(rgb2gray(framePrev), pointsPrev);
+        
+        indexPairs = matchFeatures(featuresPrev, featuresCur);
+        pointsPrev = pointsPrev(indexPairs(:,1), :);
+        pointsCur = pointsCur(indexPairs(:,2), :);
+        
+        %showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
+        
+        [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(...
+                                                pointsCur, pointsPrev, 'affine');
+        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
+        pointsCurWarped = transformPointsForward(tform, pointsCurm.Location);
+        
+%         H = tform.T;
+%         R = H(1:2,1:2);
+%         % Compute theta from mean of two possible arctangents
+%         theta = mean([atan2(R(2),R(1)) atan2(-R(3),R(4))]);
+%         % Compute scale from mean of two stable mean calculations
+%         scale = mean(R([1 4])/cos(theta));
+%         % Translation remains the same:
+%         translation = H(3, 1:2);
+%         % Reconstitute new s-R-t transform:
+%         HsRt = [[scale*[cos(theta) -sin(theta); sin(theta) cos(theta)]; ...
+%           translation], [0 0 1]'];
+%         tformsRT = affine2d(HsRt);
+% 
+%         imgBold = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
+%         imgBsRt = imwarp(frameUndistorted, tformsRT, 'OutputView', imref2d(size(frameUndistorted)));
+%         
+        flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
+        imshow(frameUndistortedWarped)
+        hold on
+        %plot(flow);
 
-    % Draw the search grid in the image
-    rectangle( 'Position',[xBuoyInitial-0.5*widthSearchArea,...
-               yBuoyInitial-0.5*heightSearchArea, widthSearchArea,...
-               heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
-               'LineStyle','-', 'Curvature', 0.2)
-    hold off
-    T = toc;
+        % Draw the search grid in the image
+        rectangle( 'Position',[xBuoyInitial-0.5*widthSearchArea,...
+                   yBuoyInitial-0.5*heightSearchArea, widthSearchArea,...
+                   heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
+                   'LineStyle','-', 'Curvature', 0.2)
+        hold off
+    end
+    framePrev = frameUndistorted;
+    T = toc
     
 %   Limit to 10 FPS
 %     if T < FPS
