@@ -71,30 +71,14 @@ while hasFrame(video)
         pointsPrev = pointsPrev(indexPairs(:,1), :);
         pointsCur = pointsCur(indexPairs(:,2), :);
         
-        %showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
+%         showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
         
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(...
-                                                pointsCur, pointsPrev, 'affine');
+                                                pointsCur, pointsPrev, 'similarity');
         frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
         pointsCurWarped = transformPointsForward(tform, pointsCurm.Location);
-        
-%         H = tform.T;
-%         R = H(1:2,1:2);
-%         % Compute theta from mean of two possible arctangents
-%         theta = mean([atan2(R(2),R(1)) atan2(-R(3),R(4))]);
-%         % Compute scale from mean of two stable mean calculations
-%         scale = mean(R([1 4])/cos(theta));
-%         % Translation remains the same:
-%         translation = H(3, 1:2);
-%         % Reconstitute new s-R-t transform:
-%         HsRt = [[scale*[cos(theta) -sin(theta); sin(theta) cos(theta)]; ...
-%           translation], [0 0 1]'];
-%         tformsRT = affine2d(HsRt);
-% 
-%         imgBold = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
-%         imgBsRt = imwarp(frameUndistorted, tformsRT, 'OutputView', imref2d(size(frameUndistorted)));
-%         
-        flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
+
+        flow = flowObj.estimateFlow(rgb2gray(frameUndistortedWarped));
         imshow(frameUndistortedWarped)
         hold on
         %plot(flow);
