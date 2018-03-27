@@ -58,7 +58,7 @@ while hasFrame(video)
     flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
     imshow(frameUndistorted)
     hold on
-    plot(flow);
+    %plot(flow);
 
     % Draw the search grid in the image
 %     rectangle('Position',[xBuoyInitial-0.5*widthSearchArea, yBuoyInitial-0.5*heightSearchArea, widthSearchArea, heightSearchArea],...
@@ -71,5 +71,5 @@ while hasFrame(video)
 %         FPS-T
 %         pause(0.04)
 %     end
-    drawnow
+    drawnow limitrate
 end
