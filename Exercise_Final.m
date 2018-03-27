@@ -33,7 +33,9 @@ yBuoy = [];
 ptThresh = 0.1;
 
 % Create optical flow object using Lucas-Kanade
-flowObj = opticalFlowHS;
+flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.002, 'NumFrames', 3,...
+                            'ImageFilterSigma', 1.5, ...
+                            'GradientFilterSigma', 2);
 
 %Loop through the video.
 flowPhaseMag = figure;
