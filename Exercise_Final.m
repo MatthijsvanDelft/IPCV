@@ -16,7 +16,7 @@ FPS = (1/5); % 5 Frames per Second
 
 %% Show the video
 % Read in the video and get its width and height.
-video = VideoReader('MAH01462.MP4');
+video = VideoReader('MAH01462.wmv');
 videoWidth = video.Width;
 videoHeight = video.Height;
 videoFPS = video.FrameRate;
@@ -31,7 +31,7 @@ xBuoyInitial = [];
 yBuoyInitial = [];
 
 % Create optical flow object using Lucas-Kanade
-flowObj = opticalFlowLK('NoiseThreshold', 0.025);
+flowObj = opticalFlowLK('NoiseThreshold', 0.0050);
 
 %Loop through the video.
 figure;
@@ -58,11 +58,13 @@ while hasFrame(video)
     flow = flowObj.estimateFlow(rgb2gray(frameUndistorted));
     imshow(frameUndistorted)
     hold on
-    %plot(flow);
+    plot(flow);
 
     % Draw the search grid in the image
-%     rectangle('Position',[xBuoyInitial-0.5*widthSearchArea, yBuoyInitial-0.5*heightSearchArea, widthSearchArea, heightSearchArea],...
-% 	'EdgeColor', 'r', 'LineWidth', 3, 'LineStyle','-', 'Curvature', 0.2)
+    rectangle( 'Position',[xBuoyInitial-0.5*widthSearchArea,...
+               yBuoyInitial-0.5*heightSearchArea, widthSearchArea,...
+               heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
+               'LineStyle','-', 'Curvature', 0.2)
     hold off
     T = toc;
     
