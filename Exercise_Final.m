@@ -27,8 +27,8 @@ ut_plot_lens_distortion(cameraParams, [videoHeight videoWidth]);
 % Initialise a frame counter.
 currentFrame = 0;
 % Initialise initial buoy coordinates.
-xBuoyInitial = [];
-yBuoyInitial = [];
+xBuoy = [];
+yBuoy = [];
 
 ptThresh = 0.1;
 
@@ -51,12 +51,12 @@ while hasFrame(video)
         % Only extract the coordinates of the buoy in the first frame.
         % GCF is the MATLAB key to the current figure.
         imshow(frame)
-        while (size(xBuoyInitial, 1) > 1 || size(yBuoyInitial, 1) > 1) || (isempty(xBuoyInitial) || isempty(yBuoyInitial))
+        while (size(xBuoy, 1) > 1 || size(yBuoy, 1) > 1) || (isempty(xBuoy) || isempty(yBuoy))
             uiwait(msgbox({'Please pick one point.';...
                            'A shift-, right-, or double-click adds a final point and ends the selection.';...
                            'Pressing Return or Enter ends the selection without adding a final point. ';...
                            'Pressing Backspace or Delete removes the previously selected point.'}, 'Attention!', 'help'));
-            [xBuoyInitial, yBuoyInitial] = getpts(gcf);
+            [xBuoy, yBuoy] = getpts(gcf);
         end
     end
     
@@ -78,14 +78,18 @@ while hasFrame(video)
         frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
         pointsCurWarped = transformPointsForward(tform, pointsCurm.Location);
 
-        flow = flowObj.estimateFlow(rgb2gray(frameUndistortedWarped));
-        imshow(frameUndistortedWarped)
+        frameCutout = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
+                                             xBuoy - 0.5*widthSearchArea : xBuoy + 0.5*widthSearchArea,...
+                                             :);
+        
+        flow = flowObj.estimateFlow(rgb2gray(frameCutout));
+        imshow(frameCutout)
         hold on
-        %plot(flow);
+        plot(flow);
 
         % Draw the search grid in the image
-        rectangle( 'Position',[xBuoyInitial-0.5*widthSearchArea,...
-                   yBuoyInitial-0.5*heightSearchArea, widthSearchArea,...
+        rectangle( 'Position',[xBuoy-0.5*widthSearchArea,...
+                   yBuoy-0.5*heightSearchArea, widthSearchArea,...
                    heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
                    'LineStyle','-', 'Curvature', 0.2)
         hold off
