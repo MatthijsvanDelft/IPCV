@@ -10,8 +10,8 @@ load('cameraParams.mat');
 load('estimationErrors.mat');
 
 % Parameters
-widthSearchArea = 100; % In pixels.
-heightSearchArea = 100; % In pixels.
+widthSearchArea = 200; % In pixels.
+heightSearchArea = 200; % In pixels.
 FPS = (1/5); % 5 Frames per Second
 
 %% Show the video
@@ -33,16 +33,16 @@ yBuoy = [];
 ptThresh = 0.1;
 
 % Create optical flow object using Lucas-Kanade
-flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.002, 'NumFrames', 3,...
-                            'ImageFilterSigma', 1.5, ...
-                            'GradientFilterSigma', 2);
-
+flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
+                            'ImageFilterSigma', 3.5, ...
+                            'GradientFilterSigma', 4.5);
+% flowObj = opticalFlowLK( 'NoiseThreshold', 0.0144);
 %Loop through the video.
 flowPhaseMag = figure;
 videoFigure = figure;
 while hasFrame(video)
     tic;
-    figure(videoFigure)
+    %figure(videoFigure)
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
@@ -84,29 +84,41 @@ while hasFrame(video)
         frameCutout = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
                                              xBuoy - 0.5*widthSearchArea : xBuoy + 0.5*widthSearchArea,...
                                              :);
+        %flow = flowObj.estimateFlow(rgb2gray(frameCutout));
+        cutoutFilter = frameCutout; %imgaussfilt(frameCutout, 1);
         
-        flow = flowObj.estimateFlow(rgb2gray(frameCutout));
-        imshow(rgb2gray(frameCutout))
+        subplot(2,2,1)
+        imshow(frameUndistortedWarped);
         hold on
-        plot(flow);
+        drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
         hold off
-        figure(flowPhaseMag);
-        polarscatter(-flow.Orientation(:), flow.Magnitude(:), '.');
+        %rotate(mesh(im2double(rgb2gray(cutoutFilter))), [0 0 1], 90)
+        %zlim([0 1])
+        %plot(flow);
+        %showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
+        subplot(2,2,2)
+        %imshow(frame)
+        %imshow(cutoutFilter);
+        Thres = adaptthresh(rgb2gray(cutoutFilter), 0.20);
+        bin = imclearborder(imbinarize(rgb2gray(cutoutFilter), Thres));
+        erod = imerode(bin, strel('disk', 1));
+        dila = imdilate(erod, strel('disk', 1));
+        imshow((dila));
         
-%         % Draw the search grid in the image
-%         rectangle( 'Position',[xBuoy-0.5*widthSearchArea,...
-%                    yBuoy-0.5*heightSearchArea, widthSearchArea,...
-%                    heightSearchArea], 'EdgeColor', 'r', 'LineWidth', 3,...
-%                    'LineStyle','-', 'Curvature', 0.2)
-%         hold off
+        subplot(2,2,3)
+        %polarscatter(-flow.Orientation(:), flow.Magnitude(:), '.');
+        imshow(cutoutFilter);
+        
+        subplot(2,2,4)
+        Thres = adaptthresh(rgb2gray(cutoutFilter), 0.20);
+        imshow(imclearborder(bin));%imclearborder(imbinarize(rgb2gray(cutoutFilter), Thres)));
+        %imshow(frameUndistortedWarped)
+        %figure(flowPhaseMag);        
+        
+        
     end
     framePrev = frameUndistorted;
     T = toc
     
-%   Limit to 10 FPS
-%     if T < FPS
-%         FPS-T
-%         pause(0.04)
-%     end
     drawnow limitrate
 end
