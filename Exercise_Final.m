@@ -40,6 +40,8 @@ flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
 %Loop through the video.
 flowPhaseMag = figure;
 videoFigure = figure;
+
+blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true);
 while hasFrame(video)
     tic;
     %figure(videoFigure)
@@ -96,7 +98,9 @@ while hasFrame(video)
         %zlim([0 1])
         %plot(flow);
         %showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
-        subplot(2,2,2)
+        title('Original image with camera stabilisation');
+        
+        subplot(2,2,4)
         %imshow(frame)
         %imshow(cutoutFilter);
         Thres = adaptthresh(rgb2gray(cutoutFilter), 0.20);
@@ -104,17 +108,22 @@ while hasFrame(video)
         erod = imerode(bin, strel('disk', 1));
         dila = imdilate(erod, strel('disk', 1));
         imshow((dila));
+        [area, centroid, bbox, labeled] = blobInfo.step(dila);
+        imshow(label2rgb(labeled));
+        title('Thresholded, eroded, dilated and labeled searchgrid');
         
         subplot(2,2,3)
         %polarscatter(-flow.Orientation(:), flow.Magnitude(:), '.');
         imshow(cutoutFilter);
         
-        subplot(2,2,4)
-        Thres = adaptthresh(rgb2gray(cutoutFilter), 0.20);
-        imshow(imclearborder(bin));%imclearborder(imbinarize(rgb2gray(cutoutFilter), Thres)));
+        title('Zoomed searchgrid');
+        
+        subplot(2,2,2)
+        imshow((dila));%imclearborder(imbinarize(rgb2gray(cutoutFilter), Thres)));
         %imshow(frameUndistortedWarped)
         %figure(flowPhaseMag);        
         
+        title('Thresholded, eroded and dilated searchgrid');
         
     end
     framePrev = frameUndistorted;
