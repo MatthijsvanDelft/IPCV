@@ -13,6 +13,7 @@ load('estimationErrors.mat');
 widthSearchArea = 200; % In pixels.
 heightSearchArea = 200; % In pixels.
 FPS = (1/5); % 5 Frames per Second
+minEccentricity = 0.3; % For perfect circle, eccentricity is 0.
 
 %% Show the video
 % Read in the video and get its width and height.
@@ -41,13 +42,15 @@ flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
 flowPhaseMag = figure;
 videoFigure = figure;
 
-blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true);
+blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true, 'EccentricityOutputPort', true);
 while hasFrame(video)
     tic;
     %figure(videoFigure)
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
+    prevVect = widthSearchArea;
+    closestToCenter = [widthSearchArea/2 heightSearchArea/2];
     
     % Fix lens distortion.
     [frameUndistorted,~] = undistortImage(frame,cameraParams);
@@ -82,7 +85,8 @@ while hasFrame(video)
                                                 pointsCur, pointsPrev, 'similarity');
         frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
         pointsCurWarped = transformPointsForward(tform, pointsCurm.Location);
-
+        
+        frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
         frameCutout = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
                                              xBuoy - 0.5*widthSearchArea : xBuoy + 0.5*widthSearchArea,...
                                              :);
@@ -107,9 +111,31 @@ while hasFrame(video)
         bin = imclearborder(imbinarize(rgb2gray(cutoutFilter), Thres));
         erod = imerode(bin, strel('disk', 1));
         dila = imdilate(erod, strel('disk', 1));
-        imshow((dila));
-        [area, centroid, bbox, labeled] = blobInfo.step(dila);
+        %imshow((dila));
+        [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(dila);
         imshow(label2rgb(labeled));
+        hold on;
+        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+        temp = eccentricity < minEccentricity;
+        for i = 1:size(eccentricity, 1)
+            if temp(i) == 1
+                rectangle('Position', [bbox(i, 1), bbox(i, 2), ...
+                          bbox(i, 3), bbox(i, 4)], ...
+                          'EdgeColor', 'r',...
+                          'LineStyle','-');
+                      
+                vect = norm( centroid(i,:) - [widthSearchArea/2 heightSearchArea/2]);
+                if vect < prevVect
+                    prevVect = vect;
+                    closestToCenter = centroid(i,:);
+                end
+            end
+        end
+        if sum(eccentricity) > 0
+            line([widthSearchArea/2 closestToCenter(1)], [heightSearchArea/2 closestToCenter(2)]); % syntax is [x1, x2], [y1, y2]
+            xBuoy = frameRef(1) + closestToCenter(1); yBuoy = frameRef(2) + closestToCenter(2);
+        end
+        hold off;
         title('Thresholded, eroded, dilated and labeled searchgrid');
         
         subplot(2,2,3)
