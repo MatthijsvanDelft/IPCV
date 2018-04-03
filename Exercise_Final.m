@@ -78,7 +78,6 @@ while hasFrame(video)
     end
     
     if currentFrame >=2
-        
         % Keypoint detection.
         pointsCur = detectFASTFeatures(rgb2gray(frameUndistorted), 'MinContrast', ptThresh);
         pointsPrev = detectFASTFeatures(rgb2gray(framePrev), 'MinContrast', ptThresh);
@@ -91,12 +90,15 @@ while hasFrame(video)
         indexPairs = matchFeatures(featuresPrev, featuresCur);
         pointsPrev = pointsPrev(indexPairs(:,1), :);
         pointsCur = pointsCur(indexPairs(:,2), :);
-        
+
 %         showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
         
         % Stabilization transformation.
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
         frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
+        
+        % Memory for camera stabilisation    
+        framePrev = frameUndistortedWarped;   
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -104,28 +106,15 @@ while hasFrame(video)
                                              xBuoy - 0.5*widthSearchArea : xBuoy + 0.5*widthSearchArea,...
                                              :);
         
-        % Visualization.
-        subplot(2,2,1)
-        imshow(frameUndistortedWarped);
-        hold on
-        drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
-        hold off
-        title('Original image with camera stabilisation');
-        
-        subplot(2,2,4)
-
+                                         
         % Morphological operations.
         Thres = adaptthresh(rgb2gray(frameCutout), 0.20);
         bin = imclearborder(imbinarize(rgb2gray(frameCutout), Thres));
         erod = imerode(bin, strel('disk', 1));
-        dila = imdilate(erod, strel('disk', 1));        
-        %imshow((dila));
+        dila = imdilate(erod, strel('disk', 1));
         
         % Blob analysis.
         [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(dila);
-        imshow(label2rgb(labeled));
-        hold on;
-        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
         
         % Calculate probability.
         numberBlobs = size(eccentricity, 1);
@@ -135,33 +124,36 @@ while hasFrame(video)
             blobProb(b,:) = (1-eccentricity(b,:))*h(round(centroid(b,1)), round(centroid(b,2)));                        
         end
         
-        thresProb = 0.005;
+        thresProb = 0.02;
         [M,I] = max(blobProb(:));
         if (M >= thresProb)
             xBuoy = round(centroid(I,1)) + frameRef(1);
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
-        
-        hold off;
-        title('Thresholded, eroded, dilated and labeled searchgrid');
-        
-        subplot(2,2,3)
-        %polarscatter(-flow.Orientation(:), flow.Magnitude(:), '.');
-        imshow(frameCutout);
-        
-        title('Zoomed searchgrid');
+%% Visualization.
+        subplot(2,2,1)
+        imshow(frameUndistortedWarped);
+        hold on
+        drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
+        hold off
+        title('Original image with camera stabilisation');
         
         subplot(2,2,2)
-        imshow((dila));%imclearborder(imbinarize(rgb2gray(frameCutout), Thres)));
-        %imshow(frameUndistortedWarped)
-        %figure(flowPhaseMag);        
-        
+        imshow((dila));      
         title('Thresholded, eroded and dilated searchgrid');
-    
-        framePrev = frameUndistortedWarped;        
+        
+        subplot(2,2,3)
+        imshow(frameCutout);
+        title('Zoomed searchgrid');
+        
+        subplot(2,2,4)        
+        imshow(label2rgb(labeled));
+        hold on;
+        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+        hold off;
+        title('Thresholded, eroded, dilated and labeled searchgrid');             
     end
     
     T = toc
-    
     drawnow limitrate
 end
