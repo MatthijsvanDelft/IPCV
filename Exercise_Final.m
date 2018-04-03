@@ -10,14 +10,16 @@ load('cameraParams.mat');
 load('estimationErrors.mat');
 
 % Parameters
-widthSearchArea = 200; % In pixels.
-heightSearchArea = 200; % In pixels.
+widthSearchArea = 100; % In pixels.
+heightSearchArea = 100; % In pixels.
 keyPointThreshold = 0.1;
 distProb_Sigma = 30; % Distance probability (gaussian), Trial and error.
 minBlobArea = 6;
-maxBlobArea = 12;
-adaptThreshSensitivity = 0.2; % Sensitivity of the adapt threshold.
+maxBlobArea = 20;
+adaptThreshSensitivity = 0.3; % Sensitivity of the adapt threshold.
 minProb = 0.02; % Minimum probability that detected blob is buoy.
+minFlow = 0;
+maxFlow = 0.1;
 
 %% Show the video
 % Read in the video and get its width and height.
@@ -38,9 +40,9 @@ xBuoy = [];
 yBuoy = [];
 
 % Create optical flow object using Lucas-Kanade Derivative of Gaussian
-flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
-                            'ImageFilterSigma', 3.5, ...
-                            'GradientFilterSigma', 4.5);
+flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0039, 'NumFrames', 3,...
+                            'ImageFilterSigma', 1.5, ...
+                            'GradientFilterSigma', 1);
 
 %Loop through the video.
 flowPhaseMag = figure;
@@ -52,7 +54,11 @@ normH = h - min(h(:));
 h = normH ./ max(normH(:));
 
 % Blob analyser.
-blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true, 'EccentricityOutputPort', true, 'MinimumBlobArea', minBlobArea, 'MaximumBlobArea', maxBlobArea);
+blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true,...
+                               'EccentricityOutputPort', true,...
+                               'MinimumBlobArea', minBlobArea,...
+                               'MaximumBlobArea', maxBlobArea,...
+                               'ExcludeBorderBlobs', true);
 
 while hasFrame(video)
     tic;
@@ -105,19 +111,26 @@ while hasFrame(video)
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
-        frameCutout = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
+        searchArea = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
                                              xBuoy - 0.5*widthSearchArea : xBuoy + 0.5*widthSearchArea,...
                                              :);
-        
+        % Flow of searcharea
+        flow = flowObj.estimateFlow(rgb2gray(searchArea));
                                          
         % Morphological operations.
-        Thres = adaptthresh(rgb2gray(frameCutout), adaptThreshSensitivity);
-        bin = imclearborder(imbinarize(rgb2gray(frameCutout), Thres));
-        erod = imerode(bin, strel('disk', 1));
-        dila = imdilate(erod, strel('disk', 1));
+        Thres = adaptthresh(rgb2gray(searchArea), adaptThreshSensitivity);
+        bin = imbinarize(rgb2gray(searchArea), Thres);
         
         % Blob analysis.
-        [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(dila);
+        [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(bin);
+        
+        temp = logical(labeled).*flow.Magnitude;
+        temp2 = temp>0;
+        temp3 = temp<maxFlow;
+        labeled2 = labeled.*uint8(temp3).*uint8(temp2);
+%         bin2 = logical(temp4);
+%         erod = imerode(bin2, strel('disk', 1));
+%         dila = imdilate(erod, strel('disk', 1));
         
         % Calculate probability.
         numberBlobs = size(eccentricity, 1);
@@ -129,27 +142,34 @@ while hasFrame(video)
         
         [M,I] = max(blobProb(:));
         if (M >= minProb)
-            xBuoy = round(centroid(I,1)) + frameRef(1);
-            yBuoy = round(centroid(I,2)) + frameRef(2);                
+%             xBuoy = round(centroid(I,1)) + frameRef(1);
+%             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
 %% Visualization.
         subplot(2,2,1)
-        imshow(frameUndistortedWarped);
+        imshow(searchArea);
         hold on
-        drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
-        hold off
-        title('Original image with camera stabilisation');
-        
-        subplot(2,2,2)
-        imshow((dila));      
-        title('Thresholded, eroded and dilated searchgrid');
-        
-        subplot(2,2,3)
-        imshow(frameCutout);
+        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+        plot(flow);
+        % Find quiver handle
+        q = findobj(gca,'type','Quiver');
+        % Change color to red
+        q.Color = 'r';
+        hold off;
         title('Zoomed searchgrid');
         
+        subplot(2,2,2)
+        imshow(label2rgb(labeled)); 
+        title('Filtered');
+        
+        subplot(2,2,3)
+%         polarplot(-flow.Orientation, flow.Magnitude, '.');
+        imshow(bin)
+        title('Non-filtered');
+        
+        
         subplot(2,2,4)        
-        imshow(label2rgb(labeled));
+        imshow(label2rgb(labeled2));
         hold on;
         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
         hold off;
