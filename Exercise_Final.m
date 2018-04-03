@@ -17,7 +17,7 @@ distProb_Sigma = 30; % Distance probability (gaussian), Trial and error.
 minBlobArea = 6;
 maxBlobArea = 20;
 adaptThreshSensitivity = 0.3; % Sensitivity of the adapt threshold.
-minProb = 0.02; % Minimum probability that detected blob is buoy.
+minProb = 0.5; % Minimum probability that detected blob is buoy.
 minFlow = 0;
 maxFlow = 0.1;
 
@@ -137,13 +137,15 @@ while hasFrame(video)
         blobProb = zeros(numberBlobs,1);
         
         for b = 1:numberBlobs
-            blobProb(b,:) = (1-eccentricity(b,:))*h(round(centroid(b,1)), round(centroid(b,2)));                        
+            if sum(sum(labeled2 == b)) > 0
+                blobProb(b,:) = (1/(eccentricity(b,:)+1))*h(round(centroid(b,1)), round(centroid(b,2)));     
+            end
         end
         
         [M,I] = max(blobProb(:));
         if (M >= minProb)
-%             xBuoy = round(centroid(I,1)) + frameRef(1);
-%             yBuoy = round(centroid(I,2)) + frameRef(2);                
+            xBuoy = round(centroid(I,1)) + frameRef(1);
+            yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
 %% Visualization.
         subplot(2,2,1)
