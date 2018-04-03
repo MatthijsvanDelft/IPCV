@@ -149,6 +149,19 @@ while hasFrame(video)
         end
 %% Visualization.
         subplot(2,2,1)
+        imshow(frameUndistortedWarped);
+        drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
+        rectangle('Position', [xBuoy-5, yBuoy-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'g');
+        title('Original video feed with camera stabilisation');
+        
+        subplot(2,2,2)
+        imshow(label2rgb(labeled))
+        hold on
+        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+        hold off
+        title('Filtered on threshold & area');
+        
+        subplot(2,2,3)
         imshow(searchArea);
         hold on
         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
@@ -160,17 +173,7 @@ while hasFrame(video)
         hold off;
         title('Zoomed searchgrid');
         
-        subplot(2,2,2)
-        imshow(label2rgb(labeled)); 
-        title('Filtered');
-        
-        subplot(2,2,3)
-%         polarplot(-flow.Orientation, flow.Magnitude, '.');
-        imshow(bin)
-        title('Non-filtered');
-        
-        
-        subplot(2,2,4)        
+        subplot(2,2,4) 
         imshow(label2rgb(labeled2));
         hold on;
         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
