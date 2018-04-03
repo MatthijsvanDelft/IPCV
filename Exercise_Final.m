@@ -12,6 +12,12 @@ load('estimationErrors.mat');
 % Parameters
 widthSearchArea = 200; % In pixels.
 heightSearchArea = 200; % In pixels.
+keyPointThreshold = 0.1;
+distProb_Sigma = 30; % Distance probability (gaussian), Trial and error.
+minBlobArea = 6;
+maxBlobArea = 12;
+adaptThreshSensitivity = 0.2; % Sensitivity of the adapt threshold.
+minProb = 0.02; % Minimum probability that detected blob is buoy.
 
 %% Show the video
 % Read in the video and get its width and height.
@@ -20,35 +26,32 @@ videoWidth = video.Width;
 videoHeight = video.Height;
 videoFPS = video.FrameRate;
 
-% Plot the lens distortion
+%% Initialisation
+% Plot the lens distortion for informative purposes.
 ut_plot_lens_distortion(cameraParams, [videoHeight videoWidth]);
 
 % Initialise a frame counter.
 currentFrame = 0;
+
 % Initialise initial buoy coordinates.
 xBuoy = [];
 yBuoy = [];
 
-ptThresh = 0.1;
-
-% Create optical flow object using Lucas-Kanade
+% Create optical flow object using Lucas-Kanade Derivative of Gaussian
 flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
                             'ImageFilterSigma', 3.5, ...
                             'GradientFilterSigma', 4.5);
-% flowObj = opticalFlowLK( 'NoiseThreshold', 0.0144);
+
 %Loop through the video.
 flowPhaseMag = figure;
 videoFigure = figure;
 
 % Probability gaussian.
-sigma = 30; %Trial and error.
-h = fspecial('gaussian', [widthSearchArea heightSearchArea], sigma);
+h = fspecial('gaussian', [widthSearchArea heightSearchArea], distProb_Sigma);
 normH = h - min(h(:));
 h = normH ./ max(normH(:));
 
 % Blob analyser.
-minBlobArea = 6;
-maxBlobArea = 12;
 blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true, 'EccentricityOutputPort', true, 'MinimumBlobArea', minBlobArea, 'MaximumBlobArea', maxBlobArea);
 
 while hasFrame(video)
@@ -79,8 +82,8 @@ while hasFrame(video)
     
     if currentFrame >=2
         % Keypoint detection.
-        pointsCur = detectFASTFeatures(rgb2gray(frameUndistorted), 'MinContrast', ptThresh);
-        pointsPrev = detectFASTFeatures(rgb2gray(framePrev), 'MinContrast', ptThresh);
+        pointsCur = detectFASTFeatures(rgb2gray(frameUndistorted), 'MinContrast', keyPointThreshold);
+        pointsPrev = detectFASTFeatures(rgb2gray(framePrev), 'MinContrast', keyPointThreshold);
         
         % Feature extraction.
         [featuresCur, pointsCur] = extractFeatures(rgb2gray(frameUndistorted), pointsCur);
@@ -108,7 +111,7 @@ while hasFrame(video)
         
                                          
         % Morphological operations.
-        Thres = adaptthresh(rgb2gray(frameCutout), 0.20);
+        Thres = adaptthresh(rgb2gray(frameCutout), adaptThreshSensitivity);
         bin = imclearborder(imbinarize(rgb2gray(frameCutout), Thres));
         erod = imerode(bin, strel('disk', 1));
         dila = imdilate(erod, strel('disk', 1));
@@ -124,9 +127,8 @@ while hasFrame(video)
             blobProb(b,:) = (1-eccentricity(b,:))*h(round(centroid(b,1)), round(centroid(b,2)));                        
         end
         
-        thresProb = 0.02;
         [M,I] = max(blobProb(:));
-        if (M >= thresProb)
+        if (M >= minProb)
             xBuoy = round(centroid(I,1)) + frameRef(1);
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
@@ -154,6 +156,6 @@ while hasFrame(video)
         title('Thresholded, eroded, dilated and labeled searchgrid');             
     end
     
-    T = toc
+    proc_time = toc
     drawnow limitrate
 end
