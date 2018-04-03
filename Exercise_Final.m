@@ -42,7 +42,17 @@ flowObj = opticalFlowLKDoG( 'NoiseThreshold', 0.0012, 'NumFrames', 3,...
 flowPhaseMag = figure;
 videoFigure = figure;
 
-blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true, 'EccentricityOutputPort', true);
+% Probability gaussian.
+sigma = 30; %Trial and error.
+h = fspecial('gaussian', [widthSearchArea heightSearchArea], sigma);
+normH = h - min(h(:));
+h = normH ./ max(normH(:));
+
+% Blob analyser.
+minBlobArea = 6;
+maxBlobArea = 20;
+blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true, 'EccentricityOutputPort', true, 'MinimumBlobArea', minBlobArea, 'MaximumBlobArea', maxBlobArea);
+
 while hasFrame(video)
     tic;
     %figure(videoFigure)
@@ -112,6 +122,8 @@ while hasFrame(video)
         erod = imerode(bin, strel('disk', 1));
         dila = imdilate(erod, strel('disk', 1));
         %imshow((dila));
+        
+        % Blob analysis.
         [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(dila);
         imshow(label2rgb(labeled));
         hold on;
@@ -120,31 +132,22 @@ while hasFrame(video)
         temp = eccentricity < minEccentricity;
         circularEnough = eccentricity(eccentricity < minEccentricity);
         circularIndices = find(eccentricity < minEccentricity);
-        for i = 1:size(circularEnough)
-            vect = norm( centroid(circularIndices(i),:) - [widthSearchArea/2 heightSearchArea/2]);
-            if vect < prevVect
-                prevVect = vect;
-                closestToCenter = centroid(i,:);
-            end
+        
+        % Calculate probability
+        numberBlobs = size(eccentricity, 1);
+        blobProb = zeros(numberBlobs,1);
+        
+        for b = 1:numberBlobs
+            blobProb(b,:) = (1-eccentricity(b,:))*h(round(centroid(b,1)), round(centroid(b,2)));                        
         end
-%         for i = 1:size(eccentricity, 1)
-%             if temp(i) == 1
-%                 rectangle('Position', [bbox(i, 1), bbox(i, 2), ...
-%                           bbox(i, 3), bbox(i, 4)], ...
-%                           'EdgeColor', 'r',...
-%                           'LineStyle','-');
-%                       
-%                 vect = norm( centroid(i,:) - [widthSearchArea/2 heightSearchArea/2]);
-%                 if vect < prevVect
-%                     prevVect = vect;
-%                     closestToCenter = centroid(i,:);
-%                 end
-%             end
-%         end
-        if sum(temp) > 0
-            line([widthSearchArea/2 closestToCenter(1)], [heightSearchArea/2 closestToCenter(2)]); % syntax is [x1, x2], [y1, y2]
-            xBuoy = frameRef(1) + closestToCenter(1); yBuoy = frameRef(2) + closestToCenter(2);
+        
+        thresProb = 0.005;
+        [M,I] = max(blobProb(:));
+        if (M >= thresProb)
+            xBuoy = round(centroid(I,1)) + frameRef(1);
+            yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
+        
         hold off;
         title('Thresholded, eroded, dilated and labeled searchgrid');
         
