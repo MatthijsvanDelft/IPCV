@@ -3,6 +3,8 @@
 clear variables
 close all
 
+writeOutputVideo = true;
+
 %% Retrieve calibration information.
 % Load the camera parameters.
 load('cameraParams.mat');
@@ -27,6 +29,11 @@ video = VideoReader('MAH01462.wmv');
 videoWidth = video.Width;
 videoHeight = video.Height;
 videoFPS = video.FrameRate;
+
+if writeOutputVideo
+    outVideo = VideoWriter('OutputVideo.avi');
+    open(outVideo);
+end
 
 %% Initialisation
 % Plot the lens distortion for informative purposes.
@@ -154,6 +161,14 @@ while hasFrame(video)
         rectangle('Position', [xBuoy-5, yBuoy-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'g');
         title('Original video feed with camera stabilisation');
         
+        if writeOutputVideo
+            % use the current warped frame and input an 
+            imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy, yBuoy], 's', 'Size', 100, 'Color', 'red');
+            imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'o', 'Size', 20, 'Color', 'green');
+            imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'x', 'Color', 'blue');
+            outVideo.writeVideo(imageToWrite);
+        end
+        
         subplot(2,2,2)
         imshow(label2rgb(labeled))
         hold on
@@ -178,9 +193,12 @@ while hasFrame(video)
         hold on;
         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
         hold off;
-        title('Thresholded, eroded, dilated and labeled searchgrid');             
+        title('Thresholded, eroded, dilated and labeled searchgrid');
     end
     
     proc_time = toc
     drawnow limitrate
+end
+if writeOutputVideo
+    close(outVideo);
 end
