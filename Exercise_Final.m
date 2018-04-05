@@ -162,7 +162,8 @@ while hasFrame(video)
         title('Original video feed with camera stabilisation');
         
         if writeOutputVideo
-            % use the current warped frame and input an 
+            % use the current warped frame and input search grid, circle
+            % and buoy location.
             imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy, yBuoy], 's', 'Size', 100, 'Color', 'red');
             imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'o', 'Size', 20, 'Color', 'green');
             imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'x', 'Color', 'blue');
