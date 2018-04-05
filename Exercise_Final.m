@@ -111,7 +111,7 @@ while hasFrame(video)
         
         % Stabilization transformation.
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
-        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(size(frameUndistorted)));
+        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.2)));
         
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
