@@ -3,7 +3,7 @@
 clear variables
 close all
 
-writeOutputVideo = true;
+writeOutputVideo = false;
 
 %% Retrieve calibration information.
 % Load the camera parameters.
@@ -116,6 +116,8 @@ while hasFrame(video)
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
+        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [10,10]);
+        
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
         searchArea = frameUndistortedWarped(yBuoy - 0.5*heightSearchArea : yBuoy + 0.5*heightSearchArea,...
@@ -154,6 +156,35 @@ while hasFrame(video)
             xBuoy = round(centroid(I,1)) + frameRef(1);
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
+        temp = rgb2gray(frameUndistortedWarped) ~= 0;
+%         %cornerPoints = detectHarrisFeatures(temp);
+        im_fx = ut_gauss(temp, 3, 1, 0);
+        im_fy = ut_gauss(temp, 3, 0, 1);
+        im_lap = im_fx + im_fy;
+        cornerPoints = detectHarrisFeatures((im_lap));
+        centers = subclust(cornerPoints.Location, 0.5);
+        width_crop = inf; height_crop = inf;
+        for i = 1:size(centers,1)
+           for j = 1:size(centers,1)
+              if i ~= j
+                 temp_x = centers(i,1) - centers(j,1);
+                 if  temp_x < width_crop && temp_x > 50 
+                     width_crop = temp_x;
+                     x_crop = centers(j,1);
+                 end
+                 temp_y = centers(i,2) - centers(j,2);
+                 if  temp_y < height_crop && temp_y > 50
+                     height_crop = temp_y;
+                     y_crop = centers(j,2);
+                 end
+              end
+           end
+        end
+        cropped = imcrop(frameUndistortedWarped, [x_crop,y_crop,width_crop,height_crop]);
+        edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
+        [H, T, R] = hough(edges);
+        P = houghpeaks(H);
+        lines = houghlines(edges, T, R, P);
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
@@ -171,11 +202,26 @@ while hasFrame(video)
         end
         
         subplot(2,2,2)
-        imshow(label2rgb(labeled))
+        imshow((cropped), [])
         hold on
-        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+        max_len = 0;
+        for k = 1:length(lines)
+           xy = [lines(k).point1; lines(k).point2];
+           plot(xy(:,1),xy(:,2),'LineWidth',2,'Color','green');
+
+           % Plot beginnings and ends of lines
+           plot(xy(1,1),xy(1,2),'x','LineWidth',2,'Color','yellow');
+           plot(xy(2,1),xy(2,2),'x','LineWidth',2,'Color','red');
+
+           % Determine the endpoints of the longest line segment
+           len = norm(lines(k).point1 - lines(k).point2);
+           if ( len > max_len)
+              max_len = len;
+              xy_long = xy;
+           end
+        end
         hold off
-        title('Filtered on threshold & area');
+        title('Hough lines');
         
         subplot(2,2,3)
         imshow(searchArea);
@@ -194,7 +240,7 @@ while hasFrame(video)
         hold on;
         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
         hold off;
-        title('Thresholded, eroded, dilated and labeled searchgrid');
+        title('Filtered on threshold, area & flow');
     end
     
     proc_time = toc
