@@ -111,12 +111,12 @@ while hasFrame(video)
         
         % Stabilization transformation.
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
-        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.2)));
+        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
-        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [10,10]);
+        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50,50]);
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -180,7 +180,7 @@ while hasFrame(video)
               end
            end
         end
-        cropped = imcrop(frameUndistortedWarped, [x_crop,y_crop,width_crop,height_crop]);
+        cropped = imcrop(frameUndistortedWarped, [x_crop+20,y_crop+20,width_crop-20,height_crop-20]);
         edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
         [H, T, R] = hough(edges);
         P = houghpeaks(H);
