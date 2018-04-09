@@ -89,6 +89,7 @@ while hasFrame(video)
                            'Pressing Return or Enter ends the selection without adding a final point. ';...
                            'Pressing Backspace or Delete removes the previously selected point.'}, 'Attention!', 'help'));
             [xBuoy, yBuoy] = getpts(gcf);
+            xBuoy = xBuoy + 50; yBuoy = yBuoy + 50; % compensate for imtranslate further ahead
         end
         framePrev = frameUndistorted;
     end
@@ -116,7 +117,7 @@ while hasFrame(video)
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
-        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50,50]);
+        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50,50]); % translate the image to ensure four corners are always detected.
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -185,6 +186,11 @@ while hasFrame(video)
         [H, T, R] = hough(edges);
         P = houghpeaks(H);
         lines = houghlines(edges, T, R, P);
+        colsHorizon = 1:size(cropped,2);
+        rowsHorizon = (getfield(lines,{1}, 'point1',{2}) - getfield(lines,{1}, 'point2', {2})) / ... %dRow rows are second coordinate
+                        (getfield(lines, {1}, 'point1', {1}) - getfield(lines, {1}, 'point2', {1})) * ... %dRow cols are first coordinate
+                        colsHorizon;
+        rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
@@ -204,22 +210,23 @@ while hasFrame(video)
         subplot(2,2,2)
         imshow((cropped), [])
         hold on
-        max_len = 0;
-        for k = 1:length(lines)
-           xy = [lines(k).point1; lines(k).point2];
-           plot(xy(:,1),xy(:,2),'LineWidth',2,'Color','green');
-
-           % Plot beginnings and ends of lines
-           plot(xy(1,1),xy(1,2),'x','LineWidth',2,'Color','yellow');
-           plot(xy(2,1),xy(2,2),'x','LineWidth',2,'Color','red');
-
-           % Determine the endpoints of the longest line segment
-           len = norm(lines(k).point1 - lines(k).point2);
-           if ( len > max_len)
-              max_len = len;
-              xy_long = xy;
-           end
-        end
+        line([1 size(cropped,2)], [rowsHorizon(1) rowsHorizon(size(cropped,2))], 'Color', 'r', 'LineWidth', 1)
+%         max_len = 0;
+%         for k = 1:length(lines)
+%            xy = [lines(k).point1; lines(k).point2];
+%            plot(xy(:,1),xy(:,2),'LineWidth',2,'Color','green');
+% 
+%            % Plot beginnings and ends of lines
+%            plot(xy(1,1),xy(1,2),'x','LineWidth',2,'Color','yellow');
+%            plot(xy(2,1),xy(2,2),'x','LineWidth',2,'Color','red');
+% 
+%            % Determine the endpoints of the longest line segment
+%            len = norm(lines(k).point1 - lines(k).point2);
+%            if ( len > max_len)
+%               max_len = len;
+%               xy_long = xy;
+%            end
+%         end
         hold off
         title('Hough lines');
         
