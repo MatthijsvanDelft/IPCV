@@ -197,9 +197,10 @@ while hasFrame(video)
                         colsHorizon;
         rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
         q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
-        tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]);
-        frameHorizonCorrected = imwarp(frameUndistortedWarped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
+        tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]); %image doesn't rotate around center
+        croppedHorizonCorrected = imwarp(cropped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         Buoy = tform_horizonRot.transformPointsForward([xBuoy yBuoy]); % compensation for rotation
+        horizon = tform_horizonRot.transformPointsForward([colsHorizon' rowsHorizon']); % horizon is straigtend and equivalent to the new croppedHorizonCorrected
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
@@ -210,7 +211,7 @@ while hasFrame(video)
         if writeOutputVideo
             % use the current warped frame and input search grid, circle
             % and buoy location.
-            imageToWrite = insertMarker(frameHorizonCorrected, Buoy, 's', 'Size', 100, 'Color', 'red');
+            imageToWrite = insertMarker(frameUndistortedWarped, Buoy, 's', 'Size', 100, 'Color', 'red');
             imageToWrite = insertMarker(imageToWrite, Buoy, 'o', 'Size', 20, 'Color', 'green');
             imageToWrite = insertMarker(imageToWrite, Buoy, 'x', 'Color', 'blue');
             imageToWrite = insertText(imageToWrite,[50 50], sprintf('%d', currentFrame));
@@ -218,7 +219,7 @@ while hasFrame(video)
         end
         
         subplot(2,2,2)
-        imshow((edges), [])
+        imshow((frameHorizonCorrected), [])
         hold on
 %         line([1 size(cropped,2)], [rowsHorizon(1) rowsHorizon(size(cropped,2))], 'Color', 'r', 'LineWidth', 1)
 %         max_len = 0;
