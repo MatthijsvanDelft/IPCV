@@ -187,6 +187,7 @@ while hasFrame(video)
            end
         end
         cropped = imcrop(frameUndistortedWarped, [x_crop+20,y_crop+20,width_crop-20,height_crop-20]);
+        buoyCropped = [xBuoy - (x_crop+20), yBuoy - (y_crop+20)];
         edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
         [H, T, R] = hough(edges);
         P = houghpeaks(H,5);
@@ -199,7 +200,7 @@ while hasFrame(video)
         q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
         tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]); %image doesn't rotate around center
         croppedHorizonCorrected = imwarp(cropped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
-        Buoy = tform_horizonRot.transformPointsForward([xBuoy yBuoy]); % compensation for rotation
+        buoyCroppedRot = tform_horizonRot.transformPointsForward(buoyCropped); % compensation for rotation
         horizon = tform_horizonRot.transformPointsForward([colsHorizon' rowsHorizon']); % horizon is straigtend and equivalent to the new croppedHorizonCorrected
 %% Visualization.
         subplot(2,2,1)
