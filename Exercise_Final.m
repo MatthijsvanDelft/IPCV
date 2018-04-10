@@ -3,7 +3,7 @@
 clear variables
 close all
 
-writeOutputVideo = false;
+writeOutputVideo = true;
 
 %% Retrieve calibration information.
 % Load the camera parameters.
@@ -67,6 +67,8 @@ blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true,...
                                'MaximumBlobArea', maxBlobArea,...
                                'ExcludeBorderBlobs', true);
 
+tform_translation = affine2d([1 0 0; 0 1 0; 50 50 1]);
+                           
 while hasFrame(video)
     tic;
     %figure(videoFigure)
@@ -89,7 +91,10 @@ while hasFrame(video)
                            'Pressing Return or Enter ends the selection without adding a final point. ';...
                            'Pressing Backspace or Delete removes the previously selected point.'}, 'Attention!', 'help'));
             [xBuoy, yBuoy] = getpts(gcf);
-            xBuoy = xBuoy + 50; yBuoy = yBuoy + 50; % compensate for imtranslate further ahead
+%             xBuoy = xBuoy+50; yBuoy=yBuoy+50;
+            Buoy = tform_translation.transformPointsForward([xBuoy yBuoy]); % compensate for imtranslate further ahead
+            xBuoy = Buoy(1); yBuoy = Buoy(2);
+            frameUndistorted = imwarp(frameUndistorted, tform_translation);
         end
         framePrev = frameUndistorted;
     end
@@ -117,7 +122,8 @@ while hasFrame(video)
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
-        frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50,50]); % translate the image to ensure four corners are always detected.
+%         frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50 50]);
+        frameUndistortedWarped = imwarp(frameUndistortedWarped, tform_translation, 'OutputView', imref2d(round(size(frameUndistorted)*1.4))); % translate the image to ensure four corners are always detected.
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -158,7 +164,6 @@ while hasFrame(video)
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
         temp = rgb2gray(frameUndistortedWarped) ~= 0;
-%         %cornerPoints = detectHarrisFeatures(temp);
         im_fx = ut_gauss(temp, 3, 1, 0);
         im_fy = ut_gauss(temp, 3, 0, 1);
         im_lap = im_fx + im_fy;
@@ -184,13 +189,17 @@ while hasFrame(video)
         cropped = imcrop(frameUndistortedWarped, [x_crop+20,y_crop+20,width_crop-20,height_crop-20]);
         edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
         [H, T, R] = hough(edges);
-        P = houghpeaks(H);
+        P = houghpeaks(H,5);
         lines = houghlines(edges, T, R, P);
         colsHorizon = 1:size(cropped,2);
         rowsHorizon = (getfield(lines,{1}, 'point1',{2}) - getfield(lines,{1}, 'point2', {2})) / ... %dRow rows are second coordinate
                         (getfield(lines, {1}, 'point1', {1}) - getfield(lines, {1}, 'point2', {1})) * ... %dRow cols are first coordinate
                         colsHorizon;
         rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
+        q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
+        tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]);
+        frameHorizonCorrected = imwarp(frameUndistortedWarped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
+        Buoy = tform_horizonRot.transformPointsForward([xBuoy yBuoy]); % compensation for rotation
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
@@ -201,16 +210,17 @@ while hasFrame(video)
         if writeOutputVideo
             % use the current warped frame and input search grid, circle
             % and buoy location.
-            imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy, yBuoy], 's', 'Size', 100, 'Color', 'red');
-            imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'o', 'Size', 20, 'Color', 'green');
-            imageToWrite = insertMarker(imageToWrite, [xBuoy, yBuoy], 'x', 'Color', 'blue');
+            imageToWrite = insertMarker(frameHorizonCorrected, Buoy, 's', 'Size', 100, 'Color', 'red');
+            imageToWrite = insertMarker(imageToWrite, Buoy, 'o', 'Size', 20, 'Color', 'green');
+            imageToWrite = insertMarker(imageToWrite, Buoy, 'x', 'Color', 'blue');
+            imageToWrite = insertText(imageToWrite,[50 50], sprintf('%d', currentFrame));
             outVideo.writeVideo(imageToWrite);
         end
         
         subplot(2,2,2)
-        imshow((cropped), [])
+        imshow((edges), [])
         hold on
-        line([1 size(cropped,2)], [rowsHorizon(1) rowsHorizon(size(cropped,2))], 'Color', 'r', 'LineWidth', 1)
+%         line([1 size(cropped,2)], [rowsHorizon(1) rowsHorizon(size(cropped,2))], 'Color', 'r', 'LineWidth', 1)
 %         max_len = 0;
 %         for k = 1:length(lines)
 %            xy = [lines(k).point1; lines(k).point2];
