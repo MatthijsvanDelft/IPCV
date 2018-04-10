@@ -202,6 +202,8 @@ while hasFrame(video)
         croppedHorizonCorrected = imwarp(cropped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         buoyCroppedRot = tform_horizonRot.transformPointsForward(buoyCropped); % compensation for rotation
         horizon = tform_horizonRot.transformPointsForward([colsHorizon' rowsHorizon']); % horizon is straigtend and equivalent to the new croppedHorizonCorrected
+        nonLinearProfile = 5600^(1/(size(cropped,1)-mean(horizon(:,2)))); % 5600 distance to horizon in real life at 2.5 meter height.
+        distanceToBuoy(currentFrame) = nonLinearProfile^(size(cropped,1)- buoyCroppedRot(2)); % needs filtering of NaNs, large differences, and fast transitions.
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
@@ -220,7 +222,7 @@ while hasFrame(video)
         end
         
         subplot(2,2,2)
-        imshow((frameHorizonCorrected), [])
+        imshow((croppedHorizonCorrected), [])
         hold on
 %         line([1 size(cropped,2)], [rowsHorizon(1) rowsHorizon(size(cropped,2))], 'Color', 'r', 'LineWidth', 1)
 %         max_len = 0;
@@ -255,11 +257,12 @@ while hasFrame(video)
         title('Zoomed searchgrid');
         
         subplot(2,2,4) 
-        imshow(label2rgb(labeled2));
-        hold on;
-        plot(widthSearchArea/2, heightSearchArea/2, 'r+');
-        hold off;
-        title('Filtered on threshold, area & flow');
+        plot(1:currentFrame, distanceToBuoy);
+%         imshow(label2rgb(labeled2));
+%         hold on;
+%         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
+%         hold off;
+%         title('Filtered on threshold, area & flow');
     end
     
     proc_time = toc
