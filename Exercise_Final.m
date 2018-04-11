@@ -72,7 +72,7 @@ blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true,...
 
 tform_translation = affine2d([1 0 0; 0 1 0; 50 50 1]);
 meanDistance = 0;
-lpFilt = designfilt('lowpassfir');
+
 while hasFrame(video)
     tic;
     %figure(videoFigure)
@@ -84,6 +84,11 @@ while hasFrame(video)
     
     % Fix lens distortion.
     [frameUndistorted,~] = undistortImage(frame,cameraParams);
+    
+    cornerPoints = [1,                              1;                          % Top left
+                    1,                              size(frameUndistorted,2);   % Top right
+                    size(frameUndistorted,1),       1;                          % Bottom left
+                    size(frameUndistorted,1),       size(frameUndistorted,2)];  % Bottom right
     
     if currentFrame == 1
         % Only extract the coordinates of the buoy in the first frame.
@@ -123,11 +128,15 @@ while hasFrame(video)
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
         frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         
+        % Transform the corner points
+        cornerPoints = tform.transformPointsForward(cornerPoints);
+        
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
 %         frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50 50]);
         frameUndistortedWarped = imwarp(frameUndistortedWarped, tform_translation, 'OutputView', imref2d(round(size(frameUndistorted)*1.4))); % translate the image to ensure four corners are always detected.
+        cornerPoints = tform_translation.transformPointsForward(cornerPoints);
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -167,30 +176,63 @@ while hasFrame(video)
             xBuoy = round(centroid(I,1)) + frameRef(1);
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
-        temp = rgb2gray(frameUndistortedWarped) ~= 0;
-        im_fx = ut_gauss(temp, 3, 1, 0);
-        im_fy = ut_gauss(temp, 3, 0, 1);
-        im_lap = im_fx + im_fy;
-        cornerPoints = detectHarrisFeatures((im_lap));
-        centers = subclust(cornerPoints.Location, 0.5);
-        width_crop = inf; height_crop = inf;
-        for i = 1:size(centers,1)
-           for j = 1:size(centers,1)
-              if i ~= j
-                 temp_x = centers(i,1) - centers(j,1);
-                 if  temp_x < width_crop && temp_x > 50 
-                     width_crop = temp_x;
-                     x_crop = centers(j,1);
-                 end
-                 temp_y = centers(i,2) - centers(j,2);
-                 if  temp_y < height_crop && temp_y > 50
-                     height_crop = temp_y;
-                     y_crop = centers(j,2);
-                 end
-              end
-           end
+%         temp = rgb2gray(frameUndistortedWarped) ~= 0;
+%         im_fx = ut_gauss(temp, 3, 1, 0);
+%         im_fy = ut_gauss(temp, 3, 0, 1);
+%         im_lap = im_fx + im_fy;
+%         cornerPoints = detectHarrisFeatures((im_lap));
+%         centers = subclust(cornerPoints.Location, 0.5);
+%         width_crop = inf; height_crop = inf;
+%         for i = 1:size(centers,1)
+%            for j = 1:size(centers,1)
+%               if i ~= j
+%                  temp_x = centers(i,1) - centers(j,1);
+%                  if  temp_x < width_crop && temp_x > 50 
+%                      width_crop = temp_x;
+%                      x_crop = centers(j,1);
+%                  end
+%                  temp_y = centers(i,2) - centers(j,2);
+%                  if  temp_y < height_crop && temp_y > 50
+%                      height_crop = temp_y;
+%                      y_crop = centers(j,2);
+%                  end
+%               end
+%            end
+%         end
+        if cornerPoints(1,2) > cornerPoints(3,2)
+            % Top left point is furthest to the right
+            x_crop = cornerPoints(1,2);
+        else
+            % Top left point is not furthest to the right thus must be
+            % bottom left.
+            x_crop = cornerPoints(3,2);
         end
-        cropped = imcrop(frameUndistortedWarped, [x_crop+20,y_crop+20,width_crop-20,height_crop-20]);
+        if cornerPoints(2,2) < cornerPoints(4,2)
+           % Top left is furthest to the left, Top right is furthest to left 
+           width_crop = cornerPoints(2,2) - x_crop;
+        else
+            % So the top right is not furthest to left
+            width_crop = cornerPoints(4,2) - x_crop;
+        end
+        
+        if cornerPoints(1,1) > cornerPoints(2,1)
+            % Top left is furthest down
+            y_crop = cornerPoints(1,1);
+        else
+            % Top left is not furthest down thus top right must be
+            y_crop = cornerPoints(2,1);
+        end
+        if cornerPoints(3,1) < cornerPoints(4,1)
+            % bottom left is furthest up
+            height_crop = cornerPoints(3,1) - y_crop;
+        else
+            % Bottom left is not furthest up thus bottom right must be
+            height_crop = cornerPoints(4,1) - y_crop;
+        end
+        
+        sprintf('x %d y%d w %d h%d', x_crop, y_crop, width_crop, height_crop)
+        
+        cropped = imcrop(frameUndistortedWarped, [x_crop+30,y_crop+30,width_crop-30,height_crop-30]);
         buoyCropped = [xBuoy - (x_crop+20), yBuoy - (y_crop+20)];
         edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
         [H, T, R] = hough(edges);
@@ -208,6 +250,7 @@ while hasFrame(video)
         horizon = tform_horizonRot.transformPointsForward([colsHorizon' rowsHorizon']); % horizon is straigtend and equivalent to the new croppedHorizonCorrected
         nonLinearProfile = realDistanceHorizon^(1/(size(cropped,1)-mean(horizon(:,2)))); 
         tempDistance = nonLinearProfile^(size(cropped,1)- buoyCroppedRot(2)); % needs filtering of NaNs, large differences, and fast transitions.
+        distanceToBuoy(currentFrame) = 0;
         if tempDistance > realDistanceHorizon || isnan(tempDistance)
             meanDistance = (distanceToBuoy(currentFrame-1)+currentFrame*meanDistance)/(currentFrame+1);
             distanceToBuoy(currentFrame) = meanDistance;
@@ -218,6 +261,12 @@ while hasFrame(video)
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
+        hold on
+        plot(cornerPoints(1,2), cornerPoints(1,1), 'r+');
+        plot(cornerPoints(2,2), cornerPoints(2,1), 'r+');
+        plot(cornerPoints(3,2), cornerPoints(3,1), 'r+');
+        plot(cornerPoints(4,2), cornerPoints(4,1), 'r+');
+        hold off
         drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
         rectangle('Position', [xBuoy-5, yBuoy-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'g');
         title('Original video feed with camera stabilisation');
@@ -276,7 +325,7 @@ while hasFrame(video)
 %         title('Filtered on threshold, area & flow');
     end
     
-    proc_time = toc
+    proc_time = toc;
     drawnow limitrate
 end
 if writeOutputVideo
