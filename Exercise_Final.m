@@ -22,6 +22,9 @@ adaptThreshSensitivity = 0.3; % Sensitivity of the adapt threshold.
 minProb = 0.5; % Minimum probability that detected blob is buoy.
 minFlow = 0;
 maxFlow = 0.1;
+radiusEarth = 6371000; %m
+cameraHeight = 2.5; %m
+realDistanceHorizon = sqrt(2*radiusEarth*cameraHeight+cameraHeight^2);
 
 %% Show the video
 % Read in the video and get its width and height.
@@ -68,7 +71,8 @@ blobInfo = vision.BlobAnalysis('LabelMatrixOutputPort', true,...
                                'ExcludeBorderBlobs', true);
 
 tform_translation = affine2d([1 0 0; 0 1 0; 50 50 1]);
-                           
+meanDistance = 0;
+lpFilt = designfilt('lowpassfir');
 while hasFrame(video)
     tic;
     %figure(videoFigure)
@@ -202,8 +206,15 @@ while hasFrame(video)
         croppedHorizonCorrected = imwarp(cropped, tform_horizonRot, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         buoyCroppedRot = tform_horizonRot.transformPointsForward(buoyCropped); % compensation for rotation
         horizon = tform_horizonRot.transformPointsForward([colsHorizon' rowsHorizon']); % horizon is straigtend and equivalent to the new croppedHorizonCorrected
-        nonLinearProfile = 5600^(1/(size(cropped,1)-mean(horizon(:,2)))); % 5600 distance to horizon in real life at 2.5 meter height.
-        distanceToBuoy(currentFrame) = nonLinearProfile^(size(cropped,1)- buoyCroppedRot(2)); % needs filtering of NaNs, large differences, and fast transitions.
+        nonLinearProfile = realDistanceHorizon^(1/(size(cropped,1)-mean(horizon(:,2)))); 
+        tempDistance = nonLinearProfile^(size(cropped,1)- buoyCroppedRot(2)); % needs filtering of NaNs, large differences, and fast transitions.
+        if tempDistance > realDistanceHorizon || isnan(tempDistance)
+            meanDistance = (distanceToBuoy(currentFrame-1)+currentFrame*meanDistance)/(currentFrame+1);
+            distanceToBuoy(currentFrame) = meanDistance;
+        else
+            meanDistance = (tempDistance+currentFrame*meanDistance)/(currentFrame+1);
+            distanceToBuoy(currentFrame) = meanDistance;
+        end
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
