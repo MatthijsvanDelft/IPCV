@@ -89,7 +89,8 @@ while hasFrame(video)
                     1,                              size(frameUndistorted,2);   % Top right
                     size(frameUndistorted,1),       1;                          % Bottom left
                     size(frameUndistorted,1),       size(frameUndistorted,2)];  % Bottom right
-    
+%     cornerPoints = fliplr(cornerPoints);
+    cornerPoints2 = cornerPoints;
     if currentFrame == 1
         % Only extract the coordinates of the buoy in the first frame.
         % GCF is the MATLAB key to the current figure.
@@ -126,17 +127,17 @@ while hasFrame(video)
         
         % Stabilization transformation.
         [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
-        frameUndistortedWarped = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
+        [frameUndistortedWarped,RB] = imwarp(frameUndistorted, tform, 'OutputView', imref2d(round(size(frameUndistorted)*1.4)));
         
         % Transform the corner points
-        cornerPoints = tform.transformPointsForward(cornerPoints);
-        
+        cornerPoints = tform.transformPointsForward(round(cornerPoints));
+
         % Memory for camera stabilisation    
         framePrev = frameUndistortedWarped;   
         
 %         frameUndistortedWarped = imtranslate(frameUndistortedWarped, [50 50]);
-        frameUndistortedWarped = imwarp(frameUndistortedWarped, tform_translation, 'OutputView', imref2d(round(size(frameUndistorted)*1.4))); % translate the image to ensure four corners are always detected.
-        cornerPoints = tform_translation.transformPointsForward(cornerPoints);
+        [frameUndistortedWarped,RB] = imwarp(frameUndistortedWarped, tform_translation, 'OutputView', imref2d(round(size(frameUndistorted)*1.4))); % translate the image to ensure four corners are always detected.
+        cornerPoints = tform_translation.transformPointsForward(round(cornerPoints));
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
@@ -230,8 +231,6 @@ while hasFrame(video)
             height_crop = cornerPoints(4,1) - y_crop;
         end
         
-        sprintf('x %d y%d w %d h%d', x_crop, y_crop, width_crop, height_crop)
-        
         cropped = imcrop(frameUndistortedWarped, [x_crop+30,y_crop+30,width_crop-30,height_crop-30]);
         buoyCropped = [xBuoy - (x_crop+20), yBuoy - (y_crop+20)];
         edges = edge(rgb2gray(cropped), 'canny', [0.2 0.5]);
@@ -266,6 +265,10 @@ while hasFrame(video)
         plot(cornerPoints(2,2), cornerPoints(2,1), 'r+');
         plot(cornerPoints(3,2), cornerPoints(3,1), 'r+');
         plot(cornerPoints(4,2), cornerPoints(4,1), 'r+');
+        plot(cornerPoints2(1,2), cornerPoints2(1,1), 'r*');
+        plot(cornerPoints2(2,2), cornerPoints2(2,1), 'r*');
+        plot(cornerPoints2(3,2), cornerPoints2(3,1), 'r*');
+        plot(cornerPoints2(4,2), cornerPoints2(4,1), 'r*');
         hold off
         drawSearchGrid(xBuoy, yBuoy, widthSearchArea, heightSearchArea);
         rectangle('Position', [xBuoy-5, yBuoy-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'g');
