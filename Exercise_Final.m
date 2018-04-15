@@ -140,9 +140,6 @@ while hasFrame(video)
         temp2 = temp>0;
         temp3 = temp<maxFlow;
         labeled2 = labeled.*uint8(temp3).*uint8(temp2);
-%         bin2 = logical(temp4);
-%         erod = imerode(bin2, strel('disk', 1));
-%         dila = imdilate(erod, strel('disk', 1));
         
         % Calculate probability.
         numberBlobs = size(eccentricity, 1);
@@ -160,27 +157,40 @@ while hasFrame(video)
             yBuoy = round(centroid(I,2)) + frameRef(2);                
         end
        
+        % Get the buoy coordinates in the unwarped, but undistorted frame.
         buoyOriginalImage = tform.transformPointsInverse([xBuoy yBuoy]);
         [buoyOriginalImage(1), buoyOriginalImage(2)] = worldToIntrinsic(worldMapping, buoyOriginalImage(1), buoyOriginalImage(2));
+        
+        % Determine the horizon by means of the hough transform.
         edges = edge(rgb2gray(frame), 'canny', [0.2 0.5]);
         [H, T, R] = hough(edges);
         P = houghpeaks(H);
         lines = houghlines(edges, T, R, P);
+        
+        % Interpolate the found horizon line over the entire widht of the
+        % image
         colsHorizon = 1:size(frame,2);
         rowsHorizon = (getfield(lines,{1}, 'point1',{2}) - getfield(lines,{1}, 'point2', {2})) / ... %dRow rows are second coordinate
                         (getfield(lines, {1}, 'point1', {1}) - getfield(lines, {1}, 'point2', {1})) * ... %dRow cols are first coordinate
                         colsHorizon;
         rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
         
+        % Use the found information from the hough transform, and use
+        % trigonometry to determine the distance to the horizon as if it
+        % were straight.
         phi = deg2rad(90 - abs(getfield(lines, {1}, 'theta')));
-        
         temp_r1 =  buoyOriginalImage(2) - rowsHorizon(round(buoyOriginalImage(2)));
-        
         L1 = (temp_r1)*cos(phi);
         L2 = (size(frame,1) - buoyOriginalImage(2)) / cos(phi);
         d_horizon = L1 + L2;
-       tempDistance = realDistanceHorizon^(L2/d_horizon);
-
+        
+        % Use the distance to the horizon and the corresponding number of
+        % pixels to create an exponential base number. L2 is then the
+        % distance in pixels from the boat to the buoy.
+        tempDistance = realDistanceHorizon^(L2/d_horizon);
+        
+        % Filter the distance calculations using a low-pass moving average
+        % filter.
         distanceToBuoy(currentFrame) = tempDistance;
 %         if tempDistance > realDistanceHorizon || isnan(tempDistance)
 %             meanDistance = (distanceToBuoy(currentFrame-1)+currentFrame*meanDistance)/(currentFrame+1);
@@ -201,10 +211,11 @@ while hasFrame(video)
         if writeOutputVideo
             % use the current warped frame and input search grid, circle
             % and buoy location.
-            imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy yBuoy], 's', 'Size', 100, 'Color', 'red');
+            imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy yBuoy], 's', 'Size', 50, 'Color', 'red');
             imageToWrite = insertMarker(imageToWrite, [xBuoy yBuoy], 'o', 'Size', 20, 'Color', 'green');
             imageToWrite = insertMarker(imageToWrite, [xBuoy yBuoy], 'x', 'Color', 'blue');
             imageToWrite = insertText(imageToWrite,[50 50], sprintf('%d', currentFrame));
+            imageToWrite = insertText(imageToWrite, [xBuoy-50 yBuoy-50], sprintf('Distance to target = %.0f m', distanceToBuoy(currentFrame)));
             outVideo.writeVideo(imageToWrite);
         end
         
@@ -212,22 +223,6 @@ while hasFrame(video)
         imshow((frame), [])
         hold on
         line([1 size(frame,2)], [rowsHorizon(1) rowsHorizon(size(frame,2))], 'Color', 'r', 'LineWidth', 1)
-%         max_len = 0;
-%         for k = 1:length(lines)
-%            xy = [lines(k).point1; lines(k).point2];
-%            plot(xy(:,1),xy(:,2),'LineWidth',2,'Color','green');
-% 
-%            % Plot beginnings and ends of lines
-%            plot(xy(1,1),xy(1,2),'x','LineWidth',2,'Color','yellow');
-%            plot(xy(2,1),xy(2,2),'x','LineWidth',2,'Color','red');
-% 
-%            % Determine the endpoints of the longest line segment
-%            len = norm(lines(k).point1 - lines(k).point2);
-%            if ( len > max_len)
-%               max_len = len;
-%               xy_long = xy;
-%            end
-%         end
         drawSearchGrid(buoyOriginalImage(1), buoyOriginalImage(2), widthSearchArea, heightSearchArea);
         rectangle('Position', [buoyOriginalImage(1)-5, buoyOriginalImage(2)-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'y');
         hold off
@@ -247,11 +242,6 @@ while hasFrame(video)
         
         subplot(2,2,4) 
         plot(1:currentFrame, distanceToBuoy);
-%         imshow(label2rgb(labeled2));
-%         hold on;
-%         plot(widthSearchArea/2, heightSearchArea/2, 'r+');
-%         hold off;
-%         title('Filtered on threshold, area & flow');
     end
     
     proc_time = toc;
