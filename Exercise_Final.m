@@ -192,13 +192,12 @@ while hasFrame(video)
         % Filter the distance calculations using a low-pass moving average
         % filter.
         distanceToBuoy(currentFrame) = tempDistance;
-%         if tempDistance > realDistanceHorizon || isnan(tempDistance)
-%             meanDistance = (distanceToBuoy(currentFrame-1)+currentFrame*meanDistance)/(currentFrame+1);
-%             distanceToBuoy(currentFrame) = meanDistance;
-%         else
-%             meanDistance = (tempDistance+currentFrame*meanDistance)/(currentFrame+1);
-%             distanceToBuoy(currentFrame) = meanDistance;
-%         end
+        
+        % Low pass filter
+        nrSample = 4;
+        if (size(distanceToBuoy,2)>nrSample)
+            distanceToBuoy(currentFrame) = 1/nrSample*(sum(distanceToBuoy(currentFrame-(nrSample-1):currentFrame)));
+        end
 %% Visualization.
         subplot(2,2,1)
         imshow(frameUndistortedWarped);
