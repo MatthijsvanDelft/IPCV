@@ -26,7 +26,7 @@ radiusEarth = 6371000; %m
 cameraHeight = 2.5; %m
 realDistanceHorizon = sqrt(2*radiusEarth*cameraHeight+cameraHeight^2);
 
-%% Show the video
+%% Read the video and initialise the output video.
 % Read in the video and get its width and height.
 video = VideoReader('MAH01462.wmv');
 videoWidth = video.Width;
@@ -129,19 +129,20 @@ while hasFrame(video)
         % Flow of searcharea
         flow = flowObj.estimateFlow(rgb2gray(searchArea));
                                          
-        % Morphological operations.
+        % Adaptive thresholding to retrieve a binarised image.
         Thres = adaptthresh(rgb2gray(searchArea), adaptThreshSensitivity);
         bin = imbinarize(rgb2gray(searchArea), Thres);
         
         % Blob analysis.
         [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(bin);
         
+        % Filter out blobs that have no flow or a flow that is too high.
         temp = logical(labeled).*flow.Magnitude;
         temp2 = temp>0;
         temp3 = temp<maxFlow;
         labeled2 = labeled.*uint8(temp3).*uint8(temp2);
         
-        % Calculate probability.
+        % Calculate probability that blob is the buoy.
         numberBlobs = size(eccentricity, 1);
         blobProb = zeros(numberBlobs,1);
         
@@ -151,6 +152,7 @@ while hasFrame(video)
             end
         end
         
+        % Select the blob with the largest probability of being the buoy.
         [M,I] = max(blobProb(:));
         if (M >= minProb)
             xBuoy = round(centroid(I,1)) + frameRef(1);
@@ -167,7 +169,7 @@ while hasFrame(video)
         P = houghpeaks(H);
         lines = houghlines(edges, T, R, P);
         
-        % Interpolate the found horizon line over the entire widht of the
+        % Interpolate the found horizon line over the entire width of the
         % image
         colsHorizon = 1:size(frame,2);
         rowsHorizon = (getfield(lines,{1}, 'point1',{2}) - getfield(lines,{1}, 'point2', {2})) / ... %dRow rows are second coordinate
@@ -176,8 +178,8 @@ while hasFrame(video)
         rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
         
         % Use the found information from the hough transform, and use
-        % trigonometry to determine the distance to the horizon as if it
-        % were straight.
+        % trigonometry to determine the perpendicular distance from the
+        % boat to the horizon.
         phi = deg2rad(90 - abs(getfield(lines, {1}, 'theta')));
         temp_r1 =  buoyOriginalImage(2) - rowsHorizon(round(buoyOriginalImage(2)));
         L1 = (temp_r1)*cos(phi);
@@ -185,15 +187,16 @@ while hasFrame(video)
         d_horizon = L1 + L2;
         
         % Use the distance to the horizon and the corresponding number of
-        % pixels to create an exponential base number. L2 is then the
-        % distance in pixels from the boat to the buoy.
+        % pixels of the buoy to create an exponential base number. 
+        % L2 is then the distance in pixels from the boat to the buoy along
+        % the perpendicular vector to the horizon.
         tempDistance = realDistanceHorizon^(L2/d_horizon);
         
         % Filter the distance calculations using a low-pass moving average
         % filter.
         distanceToBuoy(currentFrame) = tempDistance;
         
-        % Low pass filter
+        % Actual low pass filter implementation.
         nrSample = 4;
         if (size(distanceToBuoy,2)>nrSample)
             distanceToBuoy(currentFrame) = 1/nrSample*(sum(distanceToBuoy(currentFrame-(nrSample-1):currentFrame)));
@@ -225,7 +228,7 @@ while hasFrame(video)
         drawSearchGrid(buoyOriginalImage(1), buoyOriginalImage(2), widthSearchArea, heightSearchArea);
         rectangle('Position', [buoyOriginalImage(1)-5, buoyOriginalImage(2)-5, 10, 10], 'Curvature', [1 1], 'EdgeColor', 'y');
         hold off
-        title('Hough lines');
+        title('Detected horizon and buoy in original frame');
         
         subplot(2,2,3)
         imshow(searchArea);
@@ -241,11 +244,17 @@ while hasFrame(video)
         
         subplot(2,2,4) 
         plot(1:currentFrame, distanceToBuoy);
+        title('Distance to buoy');
+        xlabel('Frame number');
+        ylabel('Distance (m)');
     end
     
-    proc_time = toc;
+    proc_time = toc
     drawnow limitrate
 end
+
+% Close the output video to actually make the data available outside
+% matlab.
 if writeOutputVideo
     close(outVideo);
 end
