@@ -181,6 +181,7 @@ while hasFrame(video)
         % Create the rotation matrix to realign the horizon.
         q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
         tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]);
+        [rowsHorizonTest, colsHorizonTest] = tform_horizonRot.transformPointsForward(colsHorizon', rowsHorizon');
         
         %% Alternative distance calculation.
         % Calculate the rotation to align principle point with horizon
@@ -198,9 +199,9 @@ while hasFrame(video)
         ctw = [0;0;realDistanceHorizon];
         cMat = [cRw, ctw; zeros(1,3), 1];
         K = cameraParams.IntrinsicMatrix';
-%         M = K * [cRw ctw];
-        M = K * [eye(3) zeros(3,1)];
-        M = M * cMat;
+        M = K * [cRw ctw];
+%         M = K * [eye(3) zeros(3,1)];
+%         M = M * cMat;
         p = [buoyOriginalImage(1); buoyOriginalImage(2); 1];
         wX = M\p;
         
