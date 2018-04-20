@@ -178,6 +178,33 @@ while hasFrame(video)
                         colsHorizon;
         rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
         
+        % Create the rotation matrix to realign the horizon.
+        q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
+        tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]);
+        
+        %% Alternative distance calculation.
+        % Calculate the rotation to align principle point with horizon
+        YTranslation = cameraParams.PrincipalPoint(2) - rowsHorizonTest(round(cameraParams.PrincipalPoint(1)));
+        theta = tan(abs(YTranslation)/cameraParams.FocalLength(2));
+        
+        % Create ZXY Euler rotation matrix to correct the horizon (making
+        % it horizontal) and aligning the principle axis with the horizon.
+        eul = [theta 0 q_rad];
+        rotmZYX = eul2rotm(eul);
+
+        % Calculate the distance using camera parameters and euler matrix.
+%         cRw = eye(3);
+        cRw = rotmZYX;
+        ctw = [0;0;realDistanceHorizon];
+        cMat = [cRw, ctw; zeros(1,3), 1];
+        K = cameraParams.IntrinsicMatrix';
+%         M = K * [cRw ctw];
+        M = K * [eye(3) zeros(3,1)];
+        M = M * cMat;
+        p = [buoyOriginalImage(1); buoyOriginalImage(2); 1];
+        wX = M\p;
+        
+        %% Original distance calculation
         % Use the found information from the hough transform, and use
         % trigonometry to determine the perpendicular distance from the
         % boat to the horizon.
@@ -191,7 +218,9 @@ while hasFrame(video)
         % pixels of the buoy to create an exponential base number. 
         % L2 is then the distance in pixels from the boat to the buoy along
         % the perpendicular vector to the horizon.
+        % NOTE: swap commenting to enable alternate distance calculation.
         tempDistance = realDistanceHorizon^(L2/d_horizon);
+%         tempDistance = wX(3);
         
         % Filter the distance calculations using a low-pass moving average
         % filter.
@@ -223,7 +252,7 @@ while hasFrame(video)
         end
         
         subplot(2,2,2)
-        imshow((frame), [])
+        imshow(frame, [])
         hold on
         line([1 size(frame,2)], [rowsHorizon(1) rowsHorizon(size(frame,2))], 'Color', 'r', 'LineWidth', 1)
         drawSearchGrid(buoyOriginalImage(1), buoyOriginalImage(2), widthSearchArea, heightSearchArea);
@@ -242,7 +271,7 @@ while hasFrame(video)
         q.Color = 'r';
         hold off;
         title('Zoomed searchgrid');
-        
+%         
         subplot(2,2,4) 
         plot(1:currentFrame, distanceToBuoy);
         title('Distance to buoy');
