@@ -143,56 +143,20 @@ while hasFrame(video)
         
         % Interpolate the found horizon line over the entire width of the
         % image
-        colsHorizon = 1:size(frame,2);
-        rowsHorizon = (getfield(lines,{1}, 'point1',{2}) - getfield(lines,{1}, 'point2', {2})) / ... %dRow rows are second coordinate
-                        (getfield(lines, {1}, 'point1', {1}) - getfield(lines, {1}, 'point2', {1})) * ... %dRow cols are first coordinate
-                        colsHorizon;
-        rowsHorizon = rowsHorizon + (getfield(lines,{1}, 'point1',{2}) - rowsHorizon(getfield(lines,{1}, 'point1',{1}))); % add the 'b' in ax+b to all values
+        [rowsHorizon, colsHorizon] = interpolateHorizon(frame, lines);
         
-        % Create the rotation matrix to realign the horizon.
-        q_rad = deg2rad(-90 - getfield(lines, {1}, 'theta'));
-        tform_horizonRot = affine2d([cos(q_rad) sin(q_rad) 0; -sin(q_rad) cos(q_rad) 0; 0 0 1]);
-        [rowsHorizonTest, colsHorizonTest] = tform_horizonRot.transformPointsForward(colsHorizon', rowsHorizon');
-        
-        %% Alternative distance calculation.
-        % Calculate the rotation to align principle point with horizon
-        YTranslation = cameraParams.PrincipalPoint(2) - rowsHorizonTest(round(cameraParams.PrincipalPoint(1)));
-        theta = tan(abs(YTranslation)/cameraParams.FocalLength(2));
-        
-        % Create ZXY Euler rotation matrix to correct the horizon (making
-        % it horizontal) and aligning the principle axis with the horizon.
-        eul = [theta 0 q_rad];
-        rotmZYX = eul2rotm(eul);
-
-        % Calculate the distance using camera parameters and euler matrix.
-%         cRw = eye(3);
-        cRw = rotmZYX;
-        ctw = [0;0;realDistanceHorizon];
-        cMat = [cRw, ctw; zeros(1,3), 1];
-        K = cameraParams.IntrinsicMatrix';
-        M = K * [cRw ctw];
-%         M = K * [eye(3) zeros(3,1)];
-%         M = M * cMat;
-        p = [buoyOriginalImage(1); buoyOriginalImage(2); 1];
-        wX = M\p;
-        
-        %% Original distance calculation
-        % Use the found information from the hough transform, and use
-        % trigonometry to determine the perpendicular distance from the
-        % boat to the horizon.
-        phi = deg2rad(90 - abs(getfield(lines, {1}, 'theta')));
-        temp_r1 =  buoyOriginalImage(2) - rowsHorizon(round(buoyOriginalImage(2)));
-        L1 = (temp_r1)*cos(phi);
-        L2 = (size(frame,1) - buoyOriginalImage(2)) / cos(phi);
-        d_horizon = L1 + L2;
-        
+        %% Calculate the distance to the buoy        
         % Use the distance to the horizon and the corresponding number of
         % pixels of the buoy to create an exponential base number. 
         % L2 is then the distance in pixels from the boat to the buoy along
         % the perpendicular vector to the horizon.
         % NOTE: swap commenting to enable alternate distance calculation.
-        tempDistance = realDistanceHorizon^(L2/d_horizon);
-%         tempDistance = wX(3);
+        tempDistance = originalDistanceCalculation(frame, lines, rowsHorizon, buoyOriginalImage, realDistanceHorizon);
+%         tempDistance = alternativeDistanceCalculation(lines,...
+%                                                 cameraParams,...
+%                                                 realDistanceHorizon,...
+%                                                 buoyOriginalImage,...
+%                                                 rowsHorizon);
         
         % Filter the distance calculations using a low-pass moving average
         % filter.
