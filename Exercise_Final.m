@@ -91,27 +91,10 @@ while hasFrame(video)
     end
     
     if currentFrame >=2
-        % Keypoint detection.
-        pointsCur = detectFASTFeatures(rgb2gray(frameUndistorted), 'MinContrast', keyPointThreshold);
-        pointsPrev = detectFASTFeatures(rgb2gray(framePrev), 'MinContrast', keyPointThreshold);
+        [frameUndistortedWarped, tform] = getCameraStabilisationTransform(frameUndistorted, framePrev, keyPointThreshold, worldMapping);
         
-        % Feature extraction.
-        [featuresCur, pointsCur] = extractFeatures(rgb2gray(frameUndistorted), pointsCur);
-        [featuresPrev, pointsPrev] = extractFeatures(rgb2gray(framePrev), pointsPrev);
-        
-        % Keypoint matching.
-        indexPairs = matchFeatures(featuresPrev, featuresCur);
-        pointsPrev = pointsPrev(indexPairs(:,1), :);
-        pointsCur = pointsCur(indexPairs(:,2), :);
-
-%         showMatchedFeatures(framePrev, frameUndistorted, pointsPrev, pointsCur);
-        
-        % Stabilization transformation.
-        [tform, pointsCurm, pointsPrevm] = estimateGeometricTransform(pointsCur, pointsPrev, 'similarity');
-        [frameUndistortedWarped,~] = imwarp(frameUndistorted, tform, 'OutputView', worldMapping);
-
         % Memory for camera stabilisation    
-        framePrev = frameUndistortedWarped;   
+        framePrev = frameUndistortedWarped;
         
         % ROI.
         frameRef = [xBuoy - 0.5*widthSearchArea yBuoy - 0.5*heightSearchArea];
