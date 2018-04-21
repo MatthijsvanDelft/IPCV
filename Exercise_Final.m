@@ -78,8 +78,6 @@ while hasFrame(video)
     % Video has a new frame, thus increment currentFrame.
     currentFrame = currentFrame + 1;
     frame = readFrame(video, 'native');
-    prevVect = widthSearchArea;
-    closestToCenter = [widthSearchArea/2 heightSearchArea/2];
     
     % Fix lens distortion.
     [frameUndistorted,~] = undistortImage(frame,cameraParams);
@@ -88,14 +86,7 @@ while hasFrame(video)
     if currentFrame == 1
         % Only extract the coordinates of the buoy in the first frame.
         % GCF is the MATLAB key to the current figure.
-        imshow(frame)
-        while (size(xBuoy, 1) > 1 || size(yBuoy, 1) > 1) || (isempty(xBuoy) || isempty(yBuoy))
-            uiwait(msgbox({'Please pick one point.';...
-                           'A shift-, right-, or double-click adds a final point and ends the selection.';...
-                           'Pressing Return or Enter ends the selection without adding a final point. ';...
-                           'Pressing Backspace or Delete removes the previously selected point.'}, 'Attention!', 'help'));
-            [xBuoy, yBuoy] = getpts(gcf);
-        end
+        [xBuoy, yBuoy] = getInitialBuoyLocation(frame);
         framePrev = frameUndistorted;
     end
     
