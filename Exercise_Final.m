@@ -112,10 +112,7 @@ while hasFrame(video)
         [area, centroid, bbox, eccentricity, labeled] = blobInfo.step(bin);
         
         % Filter out blobs that have no flow or a flow that is too high.
-        temp = logical(labeled).*flow.Magnitude;
-        temp2 = temp>0;
-        temp3 = temp<maxFlow;
-        labeled2 = labeled.*uint8(temp3).*uint8(temp2);
+        labeled2 = filterBasedOnFlow(labeled, flow.Magnitude, maxFlow);
         
         % Calculate probability that blob is the buoy.
         numberBlobs = size(eccentricity, 1);
