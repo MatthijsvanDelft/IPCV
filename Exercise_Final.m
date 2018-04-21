@@ -34,7 +34,7 @@ videoHeight = video.Height;
 videoFPS = video.FrameRate;
 
 if writeOutputVideo
-    outVideo = VideoWriter('OutputVideo.avi');
+    outVideo = VideoWriter('OutputVideo.mp4', 'MPEG-4');
     open(outVideo);
 end
 
@@ -179,11 +179,13 @@ while hasFrame(video)
         if writeOutputVideo
             % use the current warped frame and input search grid, circle
             % and buoy location.
-            imageToWrite = insertMarker(frameUndistortedWarped, [xBuoy yBuoy], 's', 'Size', 50, 'Color', 'red');
-            imageToWrite = insertMarker(imageToWrite, [xBuoy yBuoy], 'o', 'Size', 20, 'Color', 'green');
-            imageToWrite = insertMarker(imageToWrite, [xBuoy yBuoy], 'x', 'Color', 'blue');
+            imageToWrite = insertMarker(frame, [buoyOriginalImage(1) buoyOriginalImage(2)], 's', 'Size', 50, 'Color', 'red');
+            if autoLocationsBuoy(currentFrame,1)~=-1
+                imageToWrite = insertMarker(imageToWrite, [buoyOriginalImage(1) buoyOriginalImage(2)], 'o', 'Size', 20, 'Color', 'green');
+                imageToWrite = insertMarker(imageToWrite, [buoyOriginalImage(1) buoyOriginalImage(2)], 'x', 'Color', 'blue');
+                imageToWrite = insertText(imageToWrite, [buoyOriginalImage(1)-50 buoyOriginalImage(2)-50], sprintf('Distance to target = %.0f m', distanceToBuoy(currentFrame)));
+            end
             imageToWrite = insertText(imageToWrite,[50 50], sprintf('%d', currentFrame));
-            imageToWrite = insertText(imageToWrite, [xBuoy-50 yBuoy-50], sprintf('Distance to target = %.0f m', distanceToBuoy(currentFrame)));
             outVideo.writeVideo(imageToWrite);
         end
         
