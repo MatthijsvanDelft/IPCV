@@ -7,9 +7,9 @@ writeOutputVideo = true;
 
 %% Retrieve calibration information.
 % Load the camera parameters.
-load('cameraParams.mat');
+load('data/cameraParams.mat');
 % Load the estimation errors during the camera calibration.
-load('estimationErrors.mat');
+load('data/estimationErrors.mat');
 
 % Parameters
 widthSearchArea = 100; % In pixels.
@@ -138,11 +138,8 @@ while hasFrame(video)
         buoyOriginalImage = tform.transformPointsInverse([xBuoy yBuoy]);
         [buoyOriginalImage(1), buoyOriginalImage(2)] = worldToIntrinsic(worldMapping, buoyOriginalImage(1), buoyOriginalImage(2));
         
-        % Determine the horizon by means of the hough transform.
-        edges = edge(rgb2gray(frame), 'canny', [0.2 0.5]);
-        [H, T, R] = hough(edges);
-        P = houghpeaks(H);
-        lines = houghlines(edges, T, R, P);
+        % Determine the horizon.
+        lines = horizonDetection(frame);
         
         % Interpolate the found horizon line over the entire width of the
         % image
