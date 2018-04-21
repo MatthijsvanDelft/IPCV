@@ -157,7 +157,10 @@ while hasFrame(video)
         [M,I] = max(blobProb(:));
         if (M >= minProb)
             xBuoy = round(centroid(I,1)) + frameRef(1);
-            yBuoy = round(centroid(I,2)) + frameRef(2);                
+            yBuoy = round(centroid(I,2)) + frameRef(2);
+            autoLocationsBuoy(currentFrame, :) = [xBuoy yBuoy];
+        else
+            autoLocationsBuoy(currentFrame,:) = [-1 -1];
         end
        
         % Get the buoy coordinates in the unwarped, but undistorted frame.
